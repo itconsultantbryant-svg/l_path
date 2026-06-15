@@ -1,4 +1,5 @@
 'use strict';
+
 const { v4: uuidv4 } = require('uuid');
 
 const BASE_ROLES = [
@@ -65,11 +66,10 @@ module.exports = {
       const existing = await queryInterface.sequelize.query(
         'SELECT id FROM roles WHERE name = :name LIMIT 1',
         {
-          type: Sequelize.QueryTypes.SELECT,
-          replacements: { name: role.name }
+          replacements: { name: role.name },
+          type: Sequelize.QueryTypes.SELECT
         }
       );
-
       if (existing.length > 0) continue;
 
       const permissionsJson = JSON.stringify(role.permissions);
