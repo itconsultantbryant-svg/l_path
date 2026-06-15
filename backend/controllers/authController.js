@@ -21,6 +21,24 @@ const maskPhone = (phone) => {
   return `${digits.slice(0, 2)}****${digits.slice(-2)}`;
 };
 
+const formatAuthUser = (user) => ({
+  id: user.id,
+  email: user.email,
+  phone: user.phone,
+  firstName: user.firstName,
+  lastName: user.lastName,
+  referralCode: user.referralCode,
+  kycStatus: user.kycStatus,
+  hasWithdrawalPin: !!(user.withdrawalPinHash && String(user.withdrawalPinHash).trim()),
+  role: user.role
+    ? {
+        id: user.role.id,
+        name: user.role.name,
+        permissions: user.role.permissions || {}
+      }
+    : null
+});
+
 /**
  * Register a new user
  */
@@ -108,6 +126,10 @@ const register = async (req, res, next) => {
     // Log action
     await logAction(user.id, 'USER_REGISTER', 'User', user.id, 'New user registration', req);
 
+    const userWithRole = await User.findByPk(user.id, {
+      include: [{ model: Role, as: 'role' }]
+    });
+
     // Generate token
     const token = generateToken(user.id);
 
@@ -115,14 +137,7 @@ const register = async (req, res, next) => {
       success: true,
       message: 'Registration successful. Please verify your account.',
       data: {
-        user: {
-          id: user.id,
-          email: user.email,
-          phone: user.phone,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          referralCode: user.referralCode
-        },
+        user: formatAuthUser(userWithRole),
         token
       }
     });
@@ -198,17 +213,7 @@ const login = async (req, res, next) => {
       success: true,
       message: 'Login successful',
       data: {
-        user: {
-          id: user.id,
-          email: user.email,
-          phone: user.phone,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role ? user.role.name : null,
-          referralCode: user.referralCode,
-          kycStatus: user.kycStatus,
-          hasWithdrawalPin: !!(user.withdrawalPinHash && String(user.withdrawalPinHash).trim())
-        },
+        user: formatAuthUser(user),
         token
       }
     });

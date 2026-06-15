@@ -3,9 +3,11 @@ const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const config = require('../config/config');
 
+const ADMIN_EMAIL = 'admin@libertypath.com';
+const ADMIN_DEFAULT_PASSWORD = 'admin123';
+
 module.exports = {
   up: async (queryInterface, Sequelize) => {
-    // Get super_admin role
     const roles = await queryInterface.sequelize.query(
       'SELECT id FROM roles WHERE name = :role LIMIT 1',
       {
@@ -24,24 +26,22 @@ module.exports = {
       'SELECT id FROM users WHERE email = :email LIMIT 1',
       {
         type: Sequelize.QueryTypes.SELECT,
-        replacements: { email: 'admin@libertypath.com' }
+        replacements: { email: ADMIN_EMAIL }
       }
     );
 
-    // Hash password
-    const salt = await bcrypt.genSalt(config.security.bcryptRounds);
-    const hashedPassword = await bcrypt.hash('Admin@LibertyPath1215', salt);
-
     let userId = existingAdmin?.[0]?.id;
+
     if (!userId) {
-      // Create super admin user
+      const salt = await bcrypt.genSalt(config.security.bcryptRounds);
+      const hashedPassword = await bcrypt.hash(ADMIN_DEFAULT_PASSWORD, salt);
       userId = uuidv4();
       const referralCode = `ADMIN${Date.now()}${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
 
       await queryInterface.bulkInsert('users', [
         {
           id: userId,
-          email: 'admin@libertypath.com',
+          email: ADMIN_EMAIL,
           password: hashedPassword,
           firstName: 'Super',
           lastName: 'Admin',
@@ -57,17 +57,21 @@ module.exports = {
         }
       ], {});
     } else {
+      // Do not reset password on redeploy — only ensure account remains usable.
       await queryInterface.bulkUpdate(
         'users',
         {
-          password: hashedPassword,
+          roleId: superAdminRoleId,
+          isActive: true,
+          isSuspended: false,
+          kycStatus: 'approved',
+          emailVerified: true,
           updatedAt: new Date()
         },
         { id: userId }
       );
     }
 
-    // Create wallet for super admin
     const existingWallet = await queryInterface.sequelize.query(
       'SELECT id FROM wallets WHERE "userId" = :userId LIMIT 1',
       {
@@ -79,7 +83,7 @@ module.exports = {
       await queryInterface.bulkInsert('wallets', [
         {
           id: uuidv4(),
-          userId: userId,
+          userId,
           balance: 0.00,
           currency: 'LRD',
           totalEarned: 0.00,
@@ -93,8 +97,7 @@ module.exports = {
     }
   },
 
-  down: async (queryInterface, Sequelize) => {
-    await queryInterface.bulkDelete('users', { email: 'admin@libertypath.com' }, {});
+  down: async (queryInterface) => {
+    await queryInterface.bulkDelete('users', { email: ADMIN_EMAIL }, {});
   }
 };
-

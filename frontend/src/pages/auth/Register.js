@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { getStaffHomePath, isStaffUser } from '../../utils/staffConfig';
 import logo from '../../assets/liberty_path_logo.png';
 
 const Register = () => {
@@ -75,10 +76,10 @@ const Register = () => {
     const result = await register(registerData);
     
     if (result.success && result.user) {
-      const roleName =
-        typeof result.user.role === 'string' ? result.user.role : result.user?.role?.name;
-      const isAdminUser = roleName === 'admin' || roleName === 'super_admin';
-      navigate(isAdminUser ? '/admin/dashboard' : '/dashboard');
+      const destination = isStaffUser(result.user)
+        ? getStaffHomePath(result.user)
+        : '/dashboard';
+      navigate(destination);
     } else if (result.success) {
       navigate('/dashboard');
     }

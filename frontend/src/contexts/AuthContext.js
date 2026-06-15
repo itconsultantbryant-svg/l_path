@@ -35,7 +35,11 @@ export const AuthProvider = ({ children }) => {
   /** Set true in login/register before setToken so follow-up /auth/me does not block the whole app */
   const authJustSucceededRef = useRef(false);
 
-  const rawApiBase = (process.env.REACT_APP_API_URL || '/api/v1').trim();
+  const DEFAULT_PRODUCTION_API = 'https://liberty-path-api.onrender.com/api/v1';
+  const rawApiBase = (
+    process.env.REACT_APP_API_URL ||
+    (process.env.NODE_ENV === 'production' ? DEFAULT_PRODUCTION_API : '/api/v1')
+  ).trim();
   const normalizedApiBase = rawApiBase.endsWith('/') ? rawApiBase.slice(0, -1) : rawApiBase;
   const API_BASE_URL = process.env.NODE_ENV === 'production' && normalizedApiBase.startsWith('http://')
     ? normalizedApiBase.replace(/^http:\/\//i, 'https://')

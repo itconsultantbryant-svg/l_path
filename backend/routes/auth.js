@@ -48,7 +48,7 @@ router.post('/register',
   authLimiter,
   [
     body('email').optional().isEmail().normalizeEmail(),
-    body('phone').optional().isMobilePhone('any', { strictMode: false }).withMessage('Please provide a valid phone number'),
+    body('phone').optional().trim().isLength({ min: 8, max: 20 }).withMessage('Please provide a valid phone number'),
     body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
     body('firstName').trim().notEmpty().withMessage('First name is required'),
     body('lastName').trim().notEmpty().withMessage('Last name is required'),
@@ -101,7 +101,7 @@ router.post('/login',
   authLimiter,
   [
     body('email').optional().isEmail().normalizeEmail(),
-    body('phone').optional().isMobilePhone('any', { strictMode: false }),
+    body('phone').optional().trim().isLength({ min: 8, max: 20 }).withMessage('Please provide a valid phone number'),
     body('password').notEmpty().withMessage('Password is required')
   ],
   handleValidationErrors,
