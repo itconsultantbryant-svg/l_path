@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext';
@@ -53,6 +53,39 @@ const Dashboard = () => {
     </>
   );
 
+  const fetchReferralData = useCallback(async () => {
+    try {
+      const res = await axios.get('/referrals/my');
+      if (res.data?.data) {
+        setReferralData(res.data.data);
+      }
+    } catch (error) {
+      // Non-blocking; promo banner just won't show if this fails
+    }
+  }, []);
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const walletRes = await axios.get('/wallet/balance');
+      const wallet = walletRes.data.data.wallet;
+
+      const packagesRes = await axios.get('/packages/my/packages');
+      const packages = packagesRes.data?.data?.packages || [];
+      const activePackages = packages.filter(p => p.status === 'active').length;
+
+      setStats({
+        balance: parseFloat(wallet.balance),
+        totalEarned: parseFloat(wallet.totalEarned),
+        activePackages
+      });
+      refreshWhatsApp(true);
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [refreshWhatsApp]);
+
   useEffect(() => {
     if (!authLoading && isStaff()) {
       navigate(getStaffHomePath(), { replace: true });
@@ -63,7 +96,7 @@ const Dashboard = () => {
       fetchStats();
       fetchReferralData();
     }
-  }, [authLoading, isStaff, getStaffHomePath, navigate]);
+  }, [authLoading, isStaff, getStaffHomePath, navigate, fetchStats, fetchReferralData]);
 
   useEffect(() => {
     if (!promoActive || !user?.id) return;
@@ -117,41 +150,6 @@ const Dashboard = () => {
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, []);
-
-  const fetchStats = async () => {
-    try {
-      // Fetch wallet balance
-      const walletRes = await axios.get('/wallet/balance');
-      const wallet = walletRes.data.data.wallet;
-
-      // Fetch packages
-      const packagesRes = await axios.get('/packages/my/packages');
-      const packages = packagesRes.data?.data?.packages || [];
-      const activePackages = packages.filter(p => p.status === 'active').length;
-
-      setStats({
-        balance: parseFloat(wallet.balance),
-        totalEarned: parseFloat(wallet.totalEarned),
-        activePackages
-      });
-      refreshWhatsApp(true);
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchReferralData = async () => {
-    try {
-      const res = await axios.get('/referrals/my');
-      if (res.data?.data) {
-        setReferralData(res.data.data);
-      }
-    } catch (error) {
-      // Non-blocking; promo banner just won't show if this fails
-    }
-  };
 
   // Show loading while auth is loading or checking admin status
   if (authLoading || loading || isStaff()) {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { resolveWhatsAppUrl } from '../../utils/whatsapp';
@@ -87,11 +87,7 @@ const AdminSettings = () => {
   const getSettingValue = (list, key, fallback = '') =>
     list.find((s) => s.key === key)?.value ?? fallback;
 
-  useEffect(() => {
-    fetchSettings();
-  }, []);
-
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     try {
       const res = await axios.get('/admin/settings');
       const list = res.data.data.settings || [];
@@ -107,7 +103,11 @@ const AdminSettings = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
 
   const updateSetting = async (key, value) => {
     await axios.put(`/admin/settings/${key}`, { value });
