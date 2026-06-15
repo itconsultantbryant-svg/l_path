@@ -1,0 +1,70 @@
+═══════════════════════════════════════════════════════════════
+    LIBERTYPATH LTD. - ADMIN LOGIN CREDENTIALS
+═══════════════════════════════════════════════════════════════
+
+✅ SYSTEM STATUS: FULLY OPERATIONAL
+
+═══════════════════════════════════════════════════════════════
+👤 ADMIN LOGIN DETAILS
+═══════════════════════════════════════════════════════════════
+
+Email:    admin@libertypath.com
+Password: admin123
+
+Role:     super_admin
+Status:   Active & Approved
+
+═══════════════════════════════════════════════════════════════
+🌐 ACCESS URLS
+═══════════════════════════════════════════════════════════════
+
+Frontend:     http://localhost:3000
+Backend API:  http://localhost:5000
+API Docs:     http://localhost:5000/api-docs
+Health Check: http://localhost:5000/health
+
+═══════════════════════════════════════════════════════════════
+🚀 QUICK START
+═══════════════════════════════════════════════════════════════
+
+1. Open browser: http://localhost:3000
+2. Click "Login"
+3. Enter:
+   Email:    admin@libertypath.com
+   Password: admin123
+4. Click "Sign in"
+5. Access admin panel via "Admin" link in navigation
+
+═══════════════════════════════════════════════════════════════
+🔧 API TEST COMMAND
+═══════════════════════════════════════════════════════════════
+
+# Login via API
+curl -X POST http://localhost:5000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@libertypath.com","password":"admin123"}'
+
+# Access admin dashboard (replace TOKEN with actual token)
+curl http://localhost:5000/api/v1/admin/dashboard \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+
+═══════════════════════════════════════════════════════════════
+📊 DATABASE
+═══════════════════════════════════════════════════════════════
+
+Type:    SQLite
+File:    backend/database.sqlite
+Tables:  16 tables created
+Status:  ✅ Ready
+
+═══════════════════════════════════════════════════════════════
+⚠️ SECURITY REMINDER
+═══════════════════════════════════════════════════════════════
+
+These are DEVELOPMENT credentials.
+Change password immediately before production deployment!
+
+═══════════════════════════════════════════════════════════════
+
+Last Updated: $(date)
+
