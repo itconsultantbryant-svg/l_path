@@ -9,6 +9,14 @@ import {
   getEffectivePermissions,
   ROLE_LABELS
 } from '../utils/staffConfig';
+import { getApiBaseUrl, getApiTimeoutMs, getBootstrapTimeoutMs } from '../utils/apiConfig';
+
+const API_BASE_URL = getApiBaseUrl();
+const API_TIMEOUT_MS = getApiTimeoutMs();
+const BOOTSTRAP_TIMEOUT_MS = getBootstrapTimeoutMs();
+
+axios.defaults.baseURL = API_BASE_URL;
+axios.defaults.timeout = API_TIMEOUT_MS;
 
 const AuthContext = createContext();
 
@@ -34,18 +42,6 @@ export const AuthProvider = ({ children }) => {
   const loginInFlightRef = useRef(false);
   /** Set true in login/register before setToken so follow-up /auth/me does not block the whole app */
   const authJustSucceededRef = useRef(false);
-
-  const DEFAULT_PRODUCTION_API = 'https://liberty-path-api.onrender.com/api/v1';
-  const rawApiBase = (
-    process.env.REACT_APP_API_URL ||
-    (process.env.NODE_ENV === 'production' ? DEFAULT_PRODUCTION_API : '/api/v1')
-  ).trim();
-  const normalizedApiBase = rawApiBase.endsWith('/') ? rawApiBase.slice(0, -1) : rawApiBase;
-  const API_BASE_URL = process.env.NODE_ENV === 'production' && normalizedApiBase.startsWith('http://')
-    ? normalizedApiBase.replace(/^http:\/\//i, 'https://')
-    : normalizedApiBase;
-  const API_TIMEOUT_MS = parseInt(process.env.REACT_APP_API_TIMEOUT_MS || '15000', 10);
-  const BOOTSTRAP_TIMEOUT_MS = parseInt(process.env.REACT_APP_BOOTSTRAP_TIMEOUT_MS || '12000', 10);
 
   const isNetworkError = (err) => {
     const code = err?.code;
