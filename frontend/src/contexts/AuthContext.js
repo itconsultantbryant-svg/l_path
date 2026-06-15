@@ -110,7 +110,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
       setConnectionIssue(false);
     }
-  }, [API_BASE_URL, API_TIMEOUT_MS, token, fetchUser]);
+  }, [token, fetchUser]);
 
   useEffect(() => {
     if (!loading) return undefined;
@@ -118,7 +118,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     }, BOOTSTRAP_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [loading, BOOTSTRAP_TIMEOUT_MS]);
+  }, [loading]);
 
   useEffect(() => {
     const handleOnline = () => {
