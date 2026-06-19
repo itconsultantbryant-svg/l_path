@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const compression = require('compression');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -79,6 +80,7 @@ const swaggerOptions = {
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
 
 // Middleware
+app.use(compression());
 app.use(helmet()); // Security headers
 app.use(cors(config.cors)); // CORS configuration
 app.use(express.json({ limit: '10mb' })); // Body parser
@@ -165,10 +167,12 @@ const startServer = async () => {
     }
 
     // Start server
-    app.listen(PORT, HOST, () => {
+    const server = app.listen(PORT, HOST, () => {
       logger.info(`Server is running on http://${HOST}:${PORT} in ${config.NODE_ENV} mode`);
       logger.info(`API Documentation available at http://${HOST}:${PORT}/api-docs`);
     });
+    server.keepAliveTimeout = 65000;
+    server.headersTimeout = 66000;
   } catch (error) {
     logger.error('Unable to start server:', error);
     process.exit(1);

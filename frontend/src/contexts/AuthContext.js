@@ -10,13 +10,11 @@ import {
   ROLE_LABELS
 } from '../utils/staffConfig';
 import { getApiBaseUrl, getApiTimeoutMs, getBootstrapTimeoutMs } from '../utils/apiConfig';
+import { isRetryableNetworkError, warmupApi } from '../utils/axiosSetup';
 
 const API_BASE_URL = getApiBaseUrl();
 const API_TIMEOUT_MS = getApiTimeoutMs();
 const BOOTSTRAP_TIMEOUT_MS = getBootstrapTimeoutMs();
-
-axios.defaults.baseURL = API_BASE_URL;
-axios.defaults.timeout = API_TIMEOUT_MS;
 
 const AuthContext = createContext();
 
@@ -28,30 +26,44 @@ export const useAuth = () => {
   return context;
 };
 
+const postWithNetworkRetry = async (url, data) => {
+  try {
+    return await axios.post(url, data);
+  } catch (error) {
+    if (!isRetryableNetworkError(error)) throw error;
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    return axios.post(url, data);
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  /** Only true when we need to verify an existing session — avoids global spinner on public routes */
   const [loading, setLoading] = useState(() => !!localStorage.getItem('token'));
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [connectionIssue, setConnectionIssue] = useState(false);
   const [online, setOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
+  const [apiReady, setApiReady] = useState(process.env.NODE_ENV !== 'production');
   const offlineToastAtRef = useRef(0);
   const busyToastAtRef = useRef(0);
   const offlineToastCooldownMs = 15000;
   const busyToastCooldownMs = 8000;
   const loginInFlightRef = useRef(false);
-  /** Set true in login/register before setToken so follow-up /auth/me does not block the whole app */
   const authJustSucceededRef = useRef(false);
+  const tokenRef = useRef(token);
 
-  const isNetworkError = (err) => {
-    const code = err?.code;
-    const message = err?.message || '';
-    return (
-      !err?.response &&
-      (['ECONNABORTED', 'ETIMEDOUT', 'ECONNRESET', 'ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED'].includes(code) ||
-        /Network Error|Failed to fetch|timeout/i.test(message))
-    );
-  };
+  useEffect(() => {
+    tokenRef.current = token;
+  }, [token]);
+
+  useEffect(() => {
+    let cancelled = false;
+    warmupApi().finally(() => {
+      if (!cancelled) setApiReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const fetchUser = useCallback(async (options = {}) => {
     const silent = options.silent === true;
@@ -71,22 +83,20 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         setConnectionIssue(false);
       } else if (status === 429) {
-        // Server reached but rate-limited — do NOT show "offline"
         setConnectionIssue(false);
         const now = Date.now();
         if (now - busyToastAtRef.current > busyToastCooldownMs) {
           busyToastAtRef.current = now;
           toast.error('The server is busy. Please wait a minute and tap Try again.');
         }
-      } else if (isNetworkError(error)) {
+      } else if (isRetryableNetworkError(error)) {
         setConnectionIssue(true);
         const now = Date.now();
         if (now - offlineToastAtRef.current > offlineToastCooldownMs) {
           offlineToastAtRef.current = now;
-          toast.error('No internet connection or server is unreachable. Please try again.');
+          toast.error('Connection is slow or the server is starting. Please wait and try again.');
         }
       } else {
-        // Other HTTP errors: server responded — not a generic "offline" state
         setConnectionIssue(false);
       }
     } finally {
@@ -123,11 +133,12 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const handleOnline = () => {
       setOnline(true);
-      setConnectionIssue(false);
+      if (tokenRef.current) {
+        fetchUser({ silent: true });
+      }
     };
     const handleOffline = () => {
       setOnline(false);
-      setConnectionIssue(true);
     };
 
     window.addEventListener('online', handleOnline);
@@ -136,7 +147,7 @@ export const AuthProvider = ({ children }) => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, []);
+  }, [fetchUser]);
 
   const login = async (emailOrPhone, password, isPhone = false) => {
     try {
@@ -147,17 +158,23 @@ export const AuthProvider = ({ children }) => {
       }
       loginInFlightRef.current = true;
 
+      if (!apiReady) {
+        await warmupApi();
+        setApiReady(true);
+      }
+
       const loginData = isPhone
         ? { phone: emailOrPhone, password }
         : { email: emailOrPhone, password };
 
-      const response = await axios.post('/auth/login', loginData);
+      const response = await postWithNetworkRetry('/auth/login', loginData);
       const { token: newToken, user: userData } = response.data.data;
 
       authJustSucceededRef.current = true;
       localStorage.setItem('token', newToken);
       setToken(newToken);
       setUser(userData);
+      setConnectionIssue(false);
       axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
 
       toast.success('Login successful!');
@@ -174,8 +191,8 @@ export const AuthProvider = ({ children }) => {
         message = retryAfterSeconds
           ? `Too many login attempts. Please wait ${retryAfterSeconds} seconds and try again.`
           : 'Too many login attempts. Please try again later.';
-      } else if (isNetworkError(error)) {
-        message = 'Unable to reach the server. Please check your internet connection and try again.';
+      } else if (isRetryableNetworkError(error)) {
+        message = 'Connection timed out. Orange, Lonestar, and WiFi networks can be slow — please wait a moment and try again.';
       }
 
       toast.error(message);
@@ -187,19 +204,28 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     try {
-      const response = await axios.post('/auth/register', userData);
+      if (!apiReady) {
+        await warmupApi();
+        setApiReady(true);
+      }
+
+      const response = await postWithNetworkRetry('/auth/register', userData);
       const { token: newToken, user: newUser } = response.data.data;
 
       authJustSucceededRef.current = true;
       localStorage.setItem('token', newToken);
       setToken(newToken);
       setUser(newUser);
+      setConnectionIssue(false);
       axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
 
       toast.success('Registration successful!');
       return { success: true, user: newUser };
     } catch (error) {
-      const message = error.response?.data?.message || 'Registration failed. Please try again.';
+      let message = error.response?.data?.message || 'Registration failed. Please try again.';
+      if (isRetryableNetworkError(error)) {
+        message = 'Connection timed out. Please wait a moment and try again.';
+      }
       toast.error(message);
       return { success: false, error: message };
     }
@@ -254,6 +280,7 @@ export const AuthProvider = ({ children }) => {
     loading,
     online,
     connectionIssue,
+    apiReady,
     login,
     register,
     logout,

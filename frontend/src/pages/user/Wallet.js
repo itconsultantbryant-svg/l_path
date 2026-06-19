@@ -34,11 +34,18 @@ const Wallet = () => {
 
   useEffect(() => {
     if (authLoading || !token) return;
-    fetchWallet();
-    fetchTransactions();
-    fetchPackages();
-    fetchDepositOptions();
-    fetchWithdrawals();
+
+    const loadWalletData = async () => {
+      await fetchWallet();
+      await Promise.allSettled([
+        fetchTransactions(),
+        fetchPackages(),
+        fetchDepositOptions(),
+        fetchWithdrawals()
+      ]);
+    };
+
+    loadWalletData();
   }, [authLoading, token]);
 
   useEffect(() => {

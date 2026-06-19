@@ -19,9 +19,10 @@ const WhatsAppContext = createContext({
 export const useWhatsApp = () => useContext(WhatsAppContext);
 
 const ENV_SUPPORT_FALLBACK = process.env.REACT_APP_WHATSAPP_GROUP_URL || '';
+const POLL_INTERVAL_MS = 5 * 60 * 1000;
 
 export const WhatsAppProvider = ({ children }) => {
-  const { token } = useAuth();
+  const { token, loading: authLoading } = useAuth();
   const [supportUrl, setSupportUrl] = useState(null);
   const [supportEnabled, setSupportEnabled] = useState(false);
   const [newUsers, setNewUsers] = useState({ url: null, enabled: false, contact: null });
@@ -39,25 +40,33 @@ export const WhatsAppProvider = ({ children }) => {
 
     try {
       const requests = [axios.get('/settings/whatsapp')];
-      if (token) {
+      if (token && !authLoading) {
         requests.push(axios.get('/settings/whatsapp/me'));
       }
 
-      const [supportRes, userRes] = await Promise.all(requests);
+      const results = await Promise.allSettled(requests);
+      const supportRes = results[0];
+      const userRes = results[1];
 
-      const supportData = supportRes.data?.data || {};
-      const supportLink = supportData.url || resolveWhatsAppUrl(ENV_SUPPORT_FALLBACK);
-      setSupportUrl(supportLink);
-      setSupportEnabled(supportData.enabled !== false && Boolean(supportLink));
+      if (supportRes.status === 'fulfilled') {
+        const supportData = supportRes.value.data?.data || {};
+        const supportLink = supportData.url || resolveWhatsAppUrl(ENV_SUPPORT_FALLBACK);
+        setSupportUrl(supportLink);
+        setSupportEnabled(supportData.enabled !== false && Boolean(supportLink));
+      } else {
+        const fallback = resolveWhatsAppUrl(ENV_SUPPORT_FALLBACK);
+        setSupportUrl(fallback);
+        setSupportEnabled(Boolean(fallback));
+      }
 
-      if (userRes?.data?.data) {
-        const data = userRes.data.data;
+      if (userRes?.status === 'fulfilled' && userRes.value?.data?.data) {
+        const data = userRes.value.data.data;
         setNewUsers(data.newUsers || { url: null, enabled: false });
         setOfficial(data.official || { url: null, enabled: false });
         setDashboard(data.dashboard || null);
         setHasApprovedDeposit(Boolean(data.hasApprovedDeposit));
         setIsActiveUser(Boolean(data.isActiveUser));
-      } else {
+      } else if (token) {
         setNewUsers({ url: null, enabled: false, contact: null });
         setOfficial({ url: null, enabled: false, contact: null });
         setDashboard(null);
@@ -73,12 +82,16 @@ export const WhatsAppProvider = ({ children }) => {
       fetchingRef.current = false;
       if (!silent) setLoading(false);
     }
-  }, [token]);
+  }, [token, authLoading]);
 
   useEffect(() => {
     refresh();
 
-    const interval = setInterval(() => refresh(true), 60000);
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        refresh(true);
+      }
+    }, POLL_INTERVAL_MS);
 
     const onFocus = () => refresh(true);
     const onVisibility = () => {

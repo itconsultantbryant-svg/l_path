@@ -1,6 +1,17 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/health",
+      "destination": "https://liberty-path-api.onrender.com/health"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "https://liberty-path-api.onrender.com/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ],
   "headers": [
     {
